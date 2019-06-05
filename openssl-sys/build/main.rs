@@ -1,6 +1,8 @@
 extern crate cc;
 #[cfg(feature = "vendored")]
 extern crate openssl_src;
+#[cfg(feature = "boringssl")]
+extern crate boringssl_src;
 extern crate pkg_config;
 extern crate autocfg;
 #[cfg(target_env = "msvc")]
@@ -10,17 +12,20 @@ use std::collections::HashSet;
 use std::env;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::str::FromStr as _;
 
 mod cfgs;
 
 #[cfg_attr(feature = "vendored", path = "find_vendored.rs")]
-#[cfg_attr(not(feature = "vendored"), path = "find_normal.rs")]
+#[cfg_attr(feature = "boringssl", path = "find_boringssl.rs")]
+#[cfg_attr(not(any(feature = "vendored", feature = "boringssl")), path = "find_normal.rs")]
 mod find;
 
 enum Version {
     Openssl11x,
     Openssl10x,
     Libressl,
+    Boringssl,
 }
 
 fn env_inner(name: &str) -> Option<OsString> {
@@ -152,87 +157,106 @@ See rust-openssl README for more information:
     let expanded = String::from_utf8(expanded).unwrap();
 
     let mut enabled = vec![];
-    let mut openssl_version = None;
-    let mut libressl_version = None;
+    let mut c_version = None;
     for line in expanded.lines() {
         let line = line.trim();
 
         let openssl_prefix = "RUST_VERSION_OPENSSL_";
         let libressl_prefix = "RUST_VERSION_LIBRESSL_";
+        let boringssl_prefix = "RUST_VERSION_BORINGSSL_";
         let conf_prefix = "RUST_CONF_";
         if line.starts_with(openssl_prefix) {
             let version = &line[openssl_prefix.len()..];
-            openssl_version = Some(parse_version(version));
+            c_version = Some(CVersion::OpenSsl(parse_version(version)));
         } else if line.starts_with(libressl_prefix) {
             let version = &line[libressl_prefix.len()..];
-            libressl_version = Some(parse_version(version));
+            c_version = Some(CVersion::LibreSsl(parse_version(version)));
+        } else if line.starts_with(boringssl_prefix) {
+            let version = &line[boringssl_prefix.len()..];
+            c_version = Some(CVersion::BoringSsl(u64::from_str(version).unwrap()));
         } else if line.starts_with(conf_prefix) {
             enabled.push(&line[conf_prefix.len()..]);
         }
     }
+    let c_version = c_version.unwrap();
 
     for enabled in &enabled {
         println!("cargo:rustc-cfg=osslconf=\"{}\"", enabled);
     }
     println!("cargo:conf={}", enabled.join(","));
 
-    for cfg in cfgs::get(openssl_version, libressl_version) {
+    for cfg in cfgs::get(c_version) {
         println!("cargo:rustc-cfg={}", cfg);
     }
 
-    if let Some(libressl_version) = libressl_version {
-        println!("cargo:libressl_version_number={:x}", libressl_version);
+    match c_version {
+        CVersion::OpenSsl(openssl_version) => {
+            println!("cargo:version_number={:x}", openssl_version);
 
-        let minor = (libressl_version >> 20) as u8;
-        let fix = (libressl_version >> 12) as u8;
-        let (minor, fix) = match (minor, fix) {
-            (5, 0) => ('5', '0'),
-            (5, 1) => ('5', '1'),
-            (5, 2) => ('5', '2'),
-            (5, _) => ('5', 'x'),
-            (6, 0) => ('6', '0'),
-            (6, 1) => ('6', '1'),
-            (6, 2) => ('6', '2'),
-            (6, _) => ('6', 'x'),
-            (7, _) => ('7', 'x'),
-            (8, 0) => ('8', '0'),
-            (8, 1) => ('8', '1'),
-            (8, _) => ('8', 'x'),
-            (9, 0) => ('9', '0'),
-            (9, _) => ('9', 'x'),
-            _ => version_error(),
-        };
+            if openssl_version >= 0x1_01_02_00_0 {
+                version_error()
+            } else if openssl_version >= 0x1_01_01_00_0 {
+                println!("cargo:version=111");
+                Version::Openssl11x
+            } else if openssl_version >= 0x1_01_00_06_0 {
+                println!("cargo:version=110");
+                println!("cargo:patch=f");
+                Version::Openssl11x
+            } else if openssl_version >= 0x1_01_00_00_0 {
+                println!("cargo:version=110");
+                Version::Openssl11x
+            } else if openssl_version >= 0x1_00_02_00_0 {
+                println!("cargo:version=102");
+                Version::Openssl10x
+            } else if openssl_version >= 0x1_00_01_00_0 {
+                println!("cargo:version=101");
+                Version::Openssl10x
+            } else {
+                version_error()
+            }
+        }
+        CVersion::LibreSsl(libressl_version) => {
+            println!("cargo:libressl_version_number={:x}", libressl_version);
 
-        println!("cargo:libressl=true");
-        println!("cargo:libressl_version=2{}{}", minor, fix);
-        println!("cargo:version=101");
-        Version::Libressl
-    } else {
-        let openssl_version = openssl_version.unwrap();
-        println!("cargo:version_number={:x}", openssl_version);
+            let minor = (libressl_version >> 20) as u8;
+            let fix = (libressl_version >> 12) as u8;
+            let (minor, fix) = match (minor, fix) {
+                (5, 0) => ('5', '0'),
+                (5, 1) => ('5', '1'),
+                (5, 2) => ('5', '2'),
+                (5, _) => ('5', 'x'),
+                (6, 0) => ('6', '0'),
+                (6, 1) => ('6', '1'),
+                (6, 2) => ('6', '2'),
+                (6, _) => ('6', 'x'),
+                (7, _) => ('7', 'x'),
+                (8, 0) => ('8', '0'),
+                (8, 1) => ('8', '1'),
+                (8, _) => ('8', 'x'),
+                (9, 0) => ('9', '0'),
+                (9, _) => ('9', 'x'),
+                _ => version_error(),
+            };
 
-        if openssl_version >= 0x1_01_02_00_0 {
-            version_error()
-        } else if openssl_version >= 0x1_01_01_00_0 {
-            println!("cargo:version=111");
-            Version::Openssl11x
-        } else if openssl_version >= 0x1_01_00_06_0 {
-            println!("cargo:version=110");
-            println!("cargo:patch=f");
-            Version::Openssl11x
-        } else if openssl_version >= 0x1_01_00_00_0 {
-            println!("cargo:version=110");
-            Version::Openssl11x
-        } else if openssl_version >= 0x1_00_02_00_0 {
-            println!("cargo:version=102");
-            Version::Openssl10x
-        } else if openssl_version >= 0x1_00_01_00_0 {
+            println!("cargo:libressl=true");
+            println!("cargo:libressl_version=2{}{}", minor, fix);
             println!("cargo:version=101");
-            Version::Openssl10x
-        } else {
-            version_error()
+            Version::Libressl
+        }
+        CVersion::BoringSsl(_) => {
+            println!("cargo:boringssl=true");
+            println!("cargo:version=101");
+            Version::Boringssl
         }
     }
+}
+
+/// The version number of the library, as declared in the C source.
+#[derive(Clone, Copy)]
+pub enum CVersion {
+    OpenSsl(u64),
+    LibreSsl(u64),
+    BoringSsl(u64),
 }
 
 fn version_error() -> ! {
