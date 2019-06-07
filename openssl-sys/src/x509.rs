@@ -110,7 +110,7 @@ extern "C" {
 }
 
 cfg_if! {
-    if #[cfg(ossl110)] {
+    if #[cfg(any(ossl110, boringssl))] {
         extern "C" {
             pub fn X509_ALGOR_get0(
                 paobj: *mut *const ASN1_OBJECT,
@@ -149,7 +149,7 @@ extern "C" {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl273))] {
+    if #[cfg(any(ossl110, libressl273, boringssl))] {
         extern "C" {
             pub fn X509_get0_signature(
                 psig: *mut *const ASN1_BIT_STRING,
@@ -246,7 +246,7 @@ extern "C" {
     pub fn X509_getm_notBefore(x: *const X509) -> *mut ASN1_TIME;
     #[cfg(any(ossl110, libressl273))]
     pub fn X509_getm_notAfter(x: *const X509) -> *mut ASN1_TIME;
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl273, boringssl))]
     pub fn X509_up_ref(x: *mut X509) -> c_int;
 
     #[cfg(ossl110)]

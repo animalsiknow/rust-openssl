@@ -56,12 +56,12 @@ impl AesKey {
     /// Returns an error if the key is not 128, 192, or 256 bits.
     pub fn new_encrypt(key: &[u8]) -> Result<AesKey, KeyError> {
         unsafe {
-            assert!(key.len() <= c_int::max_value() as usize / 8);
+            assert!(key.len() <= ffi::AesBits::max_value() as usize / 8);
 
             let mut aes_key = mem::uninitialized();
             let r = ffi::AES_set_encrypt_key(
                 key.as_ptr() as *const _,
-                key.len() as c_int * 8,
+                key.len() as ffi::AesBits * 8,
                 &mut aes_key,
             );
             if r == 0 {
@@ -79,12 +79,12 @@ impl AesKey {
     /// Returns an error if the key is not 128, 192, or 256 bits.
     pub fn new_decrypt(key: &[u8]) -> Result<AesKey, KeyError> {
         unsafe {
-            assert!(key.len() <= c_int::max_value() as usize / 8);
+            assert!(key.len() <= ffi::AesBits::max_value() as usize / 8);
 
             let mut aes_key = mem::uninitialized();
             let r = ffi::AES_set_decrypt_key(
                 key.as_ptr() as *const _,
-                key.len() as c_int * 8,
+                key.len() as ffi::AesBits * 8,
                 &mut aes_key,
             );
 
@@ -115,6 +115,7 @@ impl AesKey {
 ///
 /// Panics if `in_` is not the same length as `out`, if that length is not a multiple of 16, or if
 /// `iv` is not at least 32 bytes.
+#[cfg(not(boringssl))]
 pub fn aes_ige(in_: &[u8], out: &mut [u8], key: &AesKey, iv: &mut [u8], mode: Mode) {
     unsafe {
         assert!(in_.len() == out.len());
@@ -145,6 +146,7 @@ mod test {
 
     // From https://www.mgp25.com/AESIGE/
     #[test]
+    #[cfg(not(boringssl))]
     fn ige_vector_1() {
         let raw_key = "000102030405060708090A0B0C0D0E0F";
         let raw_iv = "000102030405060708090A0B0C0D0E0F101112131415161718191A1B1C1D1E1F";

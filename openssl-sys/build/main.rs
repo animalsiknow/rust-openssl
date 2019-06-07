@@ -8,6 +8,7 @@ extern crate autocfg;
 #[cfg(target_env = "msvc")]
 extern crate vcpkg;
 
+use cfgs::CVersion;
 use std::collections::HashSet;
 use std::env;
 use std::ffi::OsString;
@@ -249,14 +250,6 @@ See rust-openssl README for more information:
             Version::Boringssl
         }
     }
-}
-
-/// The version number of the library, as declared in the C source.
-#[derive(Clone, Copy)]
-pub enum CVersion {
-    OpenSsl(u64),
-    LibreSsl(u64),
-    BoringSsl(u64),
 }
 
 fn version_error() -> ! {

@@ -9,6 +9,10 @@ fn main() {
         println!("cargo:rustc-cfg=libressl{}", v);
     }
 
+    if let Ok(_) = env::var("DEP_OPENSSL_BORINGSSL") {
+        println!("cargo:rustc-cfg=boringssl");
+    }
+
     if let Ok(vars) = env::var("DEP_OPENSSL_CONF") {
         for var in vars.split(",") {
             println!("cargo:rustc-cfg=osslconf=\"{}\"", var);

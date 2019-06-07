@@ -22,6 +22,7 @@ pub use evp::*;
 pub use hmac::*;
 pub use obj_mac::*;
 pub use object::*;
+#[cfg(not(boringssl))]
 pub use ocsp::*;
 pub use ossl_typ::*;
 pub use pem::*;
@@ -59,6 +60,7 @@ mod evp;
 mod hmac;
 mod obj_mac;
 mod object;
+#[cfg(not(boringssl))]
 mod ocsp;
 mod ossl_typ;
 mod pem;
@@ -76,6 +78,30 @@ mod tls1;
 mod x509;
 mod x509_vfy;
 mod x509v3;
+
+cfg_if! {
+    if #[cfg(boringssl)] {
+        pub type ResultCode = c_int;
+        pub type Size = size_t;
+        pub type SizeForSslCtrl = size_t;
+        pub type Count = c_ulong;
+        pub type Char = u8;
+
+        #[repr(transparent)]
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        pub struct SizeResult(pub size_t);
+    } else {
+        pub type ResultCode = c_long;
+        pub type Size = c_int;
+        pub type SizeForSslCtrl = c_long;
+        pub type Count = c_long;
+        pub type Char = c_uchar;
+
+        #[repr(transparent)]
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+        pub struct SizeResult(pub c_long);
+    }
+}
 
 // FIXME remove
 pub type PasswordCallback = unsafe extern "C" fn(
@@ -98,7 +124,16 @@ pub fn init() {
     })
 }
 
-#[cfg(not(ossl110))]
+#[cfg(boringssl)]
+pub fn init() {
+    use std::ptr;
+
+    unsafe {
+        OPENSSL_init_ssl(0, ptr::null_mut());
+    }
+}
+
+#[cfg(not(any(ossl110, boringssl)))]
 pub fn init() {
     use std::io::{self, Write};
     use std::mem;

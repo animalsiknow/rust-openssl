@@ -144,6 +144,7 @@ impl Error {
     }
 
     /// Pushes the error back onto the OpenSSL error stack.
+    #[cfg(not(boringssl))]
     pub fn put(&self) {
         unsafe {
             ffi::ERR_put_error(
@@ -174,6 +175,13 @@ impl Error {
             if let Some((ptr, flags)) = data {
                 ffi::ERR_set_error_data(ptr, flags | ffi::ERR_TXT_STRING);
             }
+        }
+    }
+
+    #[cfg(boringssl)]
+    pub fn put(&self) {
+        unsafe {
+            // TODO(boringssl)
         }
     }
 

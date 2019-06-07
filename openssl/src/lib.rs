@@ -141,7 +141,7 @@ mod util;
 pub mod aes;
 pub mod asn1;
 pub mod bn;
-#[cfg(not(libressl))]
+#[cfg(ossl101)]
 pub mod cms;
 pub mod conf;
 pub mod derive;
@@ -149,14 +149,16 @@ pub mod dh;
 pub mod dsa;
 pub mod ec;
 pub mod ecdsa;
+#[cfg(any(ossl101, libressl261))]
 pub mod envelope;
 pub mod error;
 pub mod ex_data;
-#[cfg(not(libressl))]
+#[cfg(any(ossl101, boringssl))]
 pub mod fips;
 pub mod hash;
 pub mod memcmp;
 pub mod nid;
+#[cfg(not(boringssl))]
 pub mod ocsp;
 pub mod pkcs12;
 pub mod pkcs5;
@@ -195,5 +197,39 @@ fn cvt_n(r: c_int) -> Result<c_int, ErrorStack> {
         Err(ErrorStack::get())
     } else {
         Ok(r)
+    }
+}
+
+trait SslResult: Copy {
+    type Target;
+
+    fn get(self) -> Option<Self::Target>;
+}
+
+cfg_if! {
+    if #[cfg(boringssl)] {
+        impl SslResult for ffi::SizeResult {
+            type Target = usize;
+
+            fn get(self) -> Option<Self::Target> {
+                match self {
+                    ffi::SizeResult(0) => None,
+                    ffi::SizeResult(s) => Some(s),
+                }
+            }
+        }
+    } else {
+        impl SslResult for ffi::SizeResult {
+            type Target = usize;
+
+            fn get(self) -> Option<Self::Target> {
+                let s = self.0;
+                if s >= 0 {
+                    Some(s as usize)
+                } else {
+                    None
+                }
+            }
+        }
     }
 }

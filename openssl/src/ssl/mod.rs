@@ -99,7 +99,7 @@ use x509::store::{X509StoreBuilderRef, X509StoreRef};
 #[cfg(any(ossl102, libressl261))]
 use x509::verify::X509VerifyParamRef;
 use x509::{X509Name, X509Ref, X509StoreContextRef, X509VerifyResult, X509};
-use {cvt, cvt_n, cvt_p, init};
+use {cvt, cvt_n, cvt_p, init, SslResult};
 
 pub use ssl::connector::{
     ConnectConfiguration, SslAcceptor, SslAcceptorBuilder, SslConnector, SslConnectorBuilder,
@@ -249,7 +249,7 @@ bitflags! {
 
 bitflags! {
     /// Options controlling the behavior of an `SslContext`.
-    pub struct SslMode: c_long {
+    pub struct SslMode: ffi::SslMode {
         /// Enables "short writes".
         ///
         /// Normally, a write in OpenSSL will always write out all of the requested data, even if it
@@ -291,7 +291,7 @@ bitflags! {
         /// attempted to downgrade the protocol version of the session.
         ///
         /// Do not use this unless you know what you're doing!
-        #[cfg(not(libressl))]
+        #[cfg(any(ossl101, boringssl))]
         const SEND_FALLBACK_SCSV = ffi::SSL_MODE_SEND_FALLBACK_SCSV;
     }
 }
@@ -355,7 +355,7 @@ bitflags! {
 
 bitflags! {
     /// Options controlling the behavior of session caching.
-    pub struct SslSessionCacheMode: c_long {
+    pub struct SslSessionCacheMode: ffi::SslSessionCacheMode {
         /// No session caching for the client or server takes place.
         const OFF = ffi::SSL_SESS_CACHE_OFF;
 
@@ -703,10 +703,7 @@ impl SslContextBuilder {
             // still stored in ex data to manage the lifetime.
             let arg = self.set_ex_data_inner(SslContext::cached_ex_index::<F>(), callback);
             ffi::SSL_CTX_set_tlsext_servername_arg(self.as_ptr(), arg);
-
-            let f: extern "C" fn(_, _, _) -> _ = raw_sni::<F>;
-            let f: extern "C" fn() = mem::transmute(f);
-            ffi::SSL_CTX_set_tlsext_servername_callback(self.as_ptr(), Some(f));
+            ffi::SSL_CTX_set_tlsext_servername_callback(self.as_ptr(), Some(raw_sni::<F>));
         }
     }
 
@@ -753,7 +750,7 @@ impl SslContextBuilder {
     /// [`SSL_CTX_set_read_ahead`]: https://www.openssl.org/docs/man1.1.0/ssl/SSL_CTX_set_read_ahead.html
     pub fn set_read_ahead(&mut self, read_ahead: bool) {
         unsafe {
-            ffi::SSL_CTX_set_read_ahead(self.as_ptr(), read_ahead as c_long);
+            ffi::SSL_CTX_set_read_ahead(self.as_ptr(), read_ahead.into());
         }
     }
 
@@ -1701,8 +1698,13 @@ impl SslContextBuilder {
     /// This corresponds to [`SSL_CTX_sess_get_cache_size`].
     ///
     /// [`SSL_CTX_sess_get_cache_size`]: https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_sess_set_cache_size.html
-    pub fn set_session_cache_size(&mut self, size: i32) -> i64 {
-        unsafe { ffi::SSL_CTX_sess_set_cache_size(self.as_ptr(), size.into()).into() }
+    pub fn set_session_cache_size(&mut self, size: usize) -> usize {
+        assert!(size <= ffi::Count::max_value() as usize);
+        let result = unsafe {
+            ffi::SSL_CTX_sess_set_cache_size(self.as_ptr(), size as ffi::Count)
+        };
+        assert!(result >= 0);
+        result as usize
     }
 
     /// Consumes the builder, returning a new `SslContext`.
@@ -1911,8 +1913,10 @@ impl SslContextRef {
     /// This corresponds to [`SSL_CTX_sess_get_cache_size`].
     ///
     /// [`SSL_CTX_sess_get_cache_size`]: https://www.openssl.org/docs/man1.0.2/man3/SSL_CTX_sess_set_cache_size.html
-    pub fn session_cache_size(&self) -> i64 {
-        unsafe { ffi::SSL_CTX_sess_get_cache_size(self.as_ptr()).into() }
+    pub fn session_cache_size(&self) -> usize {
+        let result = unsafe { ffi::SSL_CTX_sess_get_cache_size(self.as_ptr()) };
+        assert!(result >= 0);
+        result as usize
     }
 }
 
@@ -2997,14 +3001,13 @@ impl SslRef {
     /// [`SSL_get_tlsext_status_ocsp_resp`]: https://www.openssl.org/docs/man1.0.2/ssl/SSL_set_tlsext_status_type.html
     pub fn ocsp_status(&self) -> Option<&[u8]> {
         unsafe {
+            #[cfg(boringssl)]
+            let mut p = ptr::null();
+            #[cfg(not(boringssl))]
             let mut p = ptr::null_mut();
-            let len = ffi::SSL_get_tlsext_status_ocsp_resp(self.as_ptr(), &mut p);
-
-            if len < 0 {
-                None
-            } else {
-                Some(slice::from_raw_parts(p as *const u8, len as usize))
-            }
+            ffi::SSL_get_tlsext_status_ocsp_resp(self.as_ptr(), &mut p).get().map(|len| {
+                slice::from_raw_parts(p as *const u8, len)
+            })
         }
     }
 
@@ -3015,17 +3018,19 @@ impl SslRef {
     /// [`SSL_set_tlsext_status_ocsp_resp`]: https://www.openssl.org/docs/man1.0.2/ssl/SSL_set_tlsext_status_type.html
     pub fn set_ocsp_status(&mut self, response: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
-            assert!(response.len() <= c_int::max_value() as usize);
+            assert!(response.len() <= ffi::SizeForSslCtrl::max_value() as usize);
             let p = cvt_p(ffi::CRYPTO_malloc(
                 response.len() as _,
                 concat!(file!(), "\0").as_ptr() as *const _,
                 line!() as c_int,
             ))?;
             ptr::copy_nonoverlapping(response.as_ptr(), p as *mut u8, response.len());
+            let len = response.len();
+            assert!(len < ffi::SizeForSslCtrl::max_value() as usize);
             cvt(ffi::SSL_set_tlsext_status_ocsp_resp(
                 self.as_ptr(),
                 p as *mut c_uchar,
-                response.len() as c_long,
+                response.len() as ffi::SizeForSslCtrl,
             ) as c_int)
             .map(|_| ())
         }
@@ -3803,7 +3808,7 @@ bitflags! {
 }
 
 cfg_if! {
-    if #[cfg(any(ossl110, libressl273))] {
+    if #[cfg(any(ossl110, libressl273, boringssl))] {
         use ffi::{SSL_CTX_up_ref, SSL_SESSION_get_master_key, SSL_SESSION_up_ref, SSL_is_server};
     } else {
         #[allow(bad_style)]

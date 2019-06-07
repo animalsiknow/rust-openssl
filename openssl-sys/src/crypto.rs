@@ -94,7 +94,7 @@ extern "C" {
     #[cfg(not(ossl110))]
     pub fn CRYPTO_set_id_callback(func: unsafe extern "C" fn() -> c_ulong);
 
-    #[cfg(not(ossl110))]
+    #[cfg(not(any(ossl110, boringssl)))]
     pub fn CRYPTO_add_lock(
         pointer: *mut c_int,
         amount: c_int,
@@ -104,11 +104,28 @@ extern "C" {
     ) -> c_int;
 }
 
+extern "C" {
+    pub fn OPENSSL_malloc(size: size_t) -> *mut c_void;
+    pub fn OPENSSL_free(ptr: *mut c_void);
+}
+
 cfg_if! {
     if #[cfg(ossl110)] {
         extern "C" {
             pub fn CRYPTO_malloc(num: size_t, file: *const c_char, line: c_int) -> *mut c_void;
             pub fn CRYPTO_free(buf: *mut c_void, file: *const c_char, line: c_int);
+        }
+    } else if #[cfg(boringssl)] {
+        pub unsafe extern "C" fn CRYPTO_malloc(
+            size: size_t,
+            _file: *const c_char,
+            _line: c_int,
+        ) -> *mut c_void {
+            OPENSSL_malloc(size)
+        }
+
+        pub unsafe extern "C" fn CRYPTO_free(ptr: *mut c_void) {
+            OPENSSL_free(ptr)
         }
     } else {
         extern "C" {
@@ -119,9 +136,9 @@ cfg_if! {
 }
 
 extern "C" {
-    #[cfg(ossl101)]
+    #[cfg(any(ossl101, boringssl))]
     pub fn FIPS_mode() -> c_int;
-    #[cfg(ossl101)]
+    #[cfg(any(ossl101, boringssl))]
     pub fn FIPS_mode_set(onoff: c_int) -> c_int;
 
     pub fn CRYPTO_memcmp(a: *const c_void, b: *const c_void, len: size_t) -> c_int;

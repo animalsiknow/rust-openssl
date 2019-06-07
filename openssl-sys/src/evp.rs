@@ -87,7 +87,13 @@ extern "C" {
         inbuf: *const u8,
         inlen: c_int,
     ) -> c_int;
+    #[cfg(not(boringssl))]
     pub fn EVP_CipherFinal(ctx: *mut EVP_CIPHER_CTX, res: *mut u8, len: *mut c_int) -> c_int;
+    pub fn EVP_CipherFinal_ex(
+        ctx: *mut EVP_CIPHER_CTX,
+        out: *mut Char,
+        out_len: *mut c_int,
+    ) -> c_int;
 
     pub fn EVP_DigestSignInit(
         ctx: *mut EVP_MD_CTX,
@@ -125,6 +131,7 @@ extern "C" {
         in_: *const u8,
         inl: c_int,
     ) -> c_int;
+    #[cfg(not(boringssl))]
     pub fn EVP_OpenInit(
         ctx: *mut EVP_CIPHER_CTX,
         type_: *const EVP_CIPHER,
@@ -133,6 +140,7 @@ extern "C" {
         iv: *const c_uchar,
         priv_: *mut EVP_PKEY,
     ) -> c_int;
+    #[cfg(not(boringssl))]
     pub fn EVP_OpenFinal(ctx: *mut EVP_CIPHER_CTX, out: *mut c_uchar, outl: *mut c_int) -> c_int;
     pub fn EVP_DecryptUpdate(
         ctx: *mut EVP_CIPHER_CTX,
@@ -143,7 +151,7 @@ extern "C" {
     ) -> c_int;
 }
 cfg_if! {
-    if #[cfg(any(ossl111b, libressl280))] {
+    if #[cfg(any(ossl111b, libressl280, boringssl))] {
         extern "C" {
             pub fn EVP_PKEY_size(pkey: *const EVP_PKEY) -> c_int;
         }
@@ -154,11 +162,11 @@ cfg_if! {
     }
 }
 cfg_if! {
-    if #[cfg(any(ossl102, libressl280))] {
+    if #[cfg(any(ossl102, libressl280, boringssl))] {
         extern "C" {
             pub fn EVP_DigestVerifyFinal(
                 ctx: *mut EVP_MD_CTX,
-                sigret: *const c_uchar,
+                sigret: *const Char,
                 siglen: size_t,
             ) -> c_int;
         }
@@ -166,7 +174,7 @@ cfg_if! {
         extern "C" {
             pub fn EVP_DigestVerifyFinal(
                 ctx: *mut EVP_MD_CTX,
-                sigret: *mut c_uchar,
+                sigret: *mut Char,
                 siglen: size_t,
             ) -> c_int;
         }
@@ -204,34 +212,49 @@ extern "C" {
     pub fn EVP_shake128() -> *const EVP_MD;
     #[cfg(ossl111)]
     pub fn EVP_shake256() -> *const EVP_MD;
+    #[cfg(not(boringssl))]
     pub fn EVP_ripemd160() -> *const EVP_MD;
     pub fn EVP_des_ecb() -> *const EVP_CIPHER;
     pub fn EVP_des_ede3() -> *const EVP_CIPHER;
     pub fn EVP_des_ede3_cbc() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_des_ede3_cfb64() -> *const EVP_CIPHER;
     pub fn EVP_des_cbc() -> *const EVP_CIPHER;
     pub fn EVP_rc4() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_bf_ecb() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_bf_cbc() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_bf_cfb64() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_bf_ofb() -> *const EVP_CIPHER;
     pub fn EVP_aes_128_ecb() -> *const EVP_CIPHER;
     pub fn EVP_aes_128_cbc() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_128_cfb1() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_128_cfb8() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_128_cfb128() -> *const EVP_CIPHER;
     pub fn EVP_aes_128_ctr() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_128_ccm() -> *const EVP_CIPHER;
     pub fn EVP_aes_128_gcm() -> *const EVP_CIPHER;
     pub fn EVP_aes_128_xts() -> *const EVP_CIPHER;
     pub fn EVP_aes_256_ecb() -> *const EVP_CIPHER;
     pub fn EVP_aes_256_cbc() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_256_cfb1() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_256_cfb8() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_256_cfb128() -> *const EVP_CIPHER;
     pub fn EVP_aes_256_ctr() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_256_ccm() -> *const EVP_CIPHER;
     pub fn EVP_aes_256_gcm() -> *const EVP_CIPHER;
+    #[cfg(not(boringssl))]
     pub fn EVP_aes_256_xts() -> *const EVP_CIPHER;
     #[cfg(ossl110)]
     pub fn EVP_chacha20() -> *const ::EVP_CIPHER;
@@ -351,6 +374,7 @@ extern "C" {
         p2: *mut c_void,
     ) -> c_int;
 
+    #[cfg(not(boringssl))]
     pub fn EVP_PKEY_new_mac_key(
         type_: c_int,
         e: *mut ENGINE,

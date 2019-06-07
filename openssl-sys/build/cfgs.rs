@@ -1,4 +1,10 @@
-use super::CVersion;
+/// The version number of the library, as declared in the C source.
+#[derive(Clone, Copy)]
+pub enum CVersion {
+    OpenSsl(u64),
+    LibreSsl(u64),
+    BoringSsl(u64),
+}
 
 pub fn get(version: CVersion) -> Vec<&'static str> {
     let mut cfgs = vec![];

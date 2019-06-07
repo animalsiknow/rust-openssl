@@ -796,6 +796,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(not(boringssl))]
     fn test_to_password() {
         let key = Rsa::generate(2048).unwrap();
         let pem = key

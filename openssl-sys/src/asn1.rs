@@ -26,7 +26,7 @@ stack!(stack_st_ASN1_OBJECT);
 
 extern "C" {
     pub fn ASN1_STRING_type_new(ty: c_int) -> *mut ASN1_STRING;
-    #[cfg(any(ossl110, libressl273))]
+    #[cfg(any(ossl110, libressl273, boringssl))]
     pub fn ASN1_STRING_get0_data(x: *const ASN1_STRING) -> *const c_uchar;
     #[cfg(any(all(ossl101, not(ossl110)), libressl))]
     pub fn ASN1_STRING_data(x: *mut ASN1_STRING) -> *mut c_uchar;

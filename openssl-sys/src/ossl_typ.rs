@@ -296,6 +296,32 @@ cfg_if! {
             sha1_hash: [c_uchar; 20],
             aux: *mut c_void,
         }
+    } else if #[cfg(boringssl)] {
+        #[repr(C)]
+        pub struct X509 {
+            pub cert_info: *mut X509_CINF,
+            pub sig_alg: *mut X509_ALGOR,
+            pub signature: *mut ASN1_BIT_STRING,
+            pub references: CRYPTO_refcount_t,
+            pub name: *mut c_char,
+            pub ex_data: CRYPTO_EX_DATA,
+            pub ex_pathlen: c_long,
+            pub ex_pcpathlen: c_long,
+            pub ex_flags: c_ulong,
+            pub ex_kusage: c_ulong,
+            pub ex_kxusage: c_ulong,
+            pub ex_nscert: c_ulong,
+            pub skid: *mut ASN1_OCTET_STRING,
+            pub akid: *mut c_void,
+            pub policy_cache: *mut c_void,
+            pub crldp: *mut c_void,
+            pub altname: *mut c_void,
+            pub nc: *mut c_void,
+            pub sha1_hash: [c_uchar; 20],
+            pub aux: *mut c_void,
+            pub buf: *mut c_void,
+            pub lock: CRYPTO_MUTEX,
+        }
     } else {
         #[repr(C)]
         pub struct X509 {
@@ -402,7 +428,7 @@ pub struct X509V3_CTX {
     // Maybe more here
 }
 pub enum CONF {}
-#[cfg(ossl110)]
+#[cfg(any(ossl110, boringssl))]
 pub enum OPENSSL_INIT_SETTINGS {}
 
 pub enum ENGINE {}
@@ -989,3 +1015,20 @@ cfg_if! {
 }
 
 pub enum OCSP_RESPONSE {}
+
+pub type CRYPTO_refcount_t = u32;
+
+cfg_if! {
+    if #[cfg(all(boringssl, target_family = "windows"))] {
+        pub union CRYPTO_MUTEX {
+            handle: *mut c_void,
+        }
+    } else if #[cfg(all(boringssl, target_os = "macos"))] {
+        type CRYPTO_MUTEX = pthread_rwlock_t;
+    } else if #[cfg(boringssl)] {
+        pub union CRYPTO_MUTEX {
+            _alignment: c_double,
+            _padding: [u8; 3 * std::mem::sizeof::<c_int>() + 5 * std::mem::sizeof::<c_uint>() + 16 + 8],
+        }
+    }
+}

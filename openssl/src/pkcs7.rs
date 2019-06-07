@@ -69,6 +69,7 @@ impl Pkcs7 {
     /// This corresponds to [`SMIME_read_PKCS7`].
     ///
     /// [`SMIME_read_PKCS7`]: https://www.openssl.org/docs/man1.1.0/crypto/SMIME_read_PKCS7.html
+    #[cfg(not(boringssl))]
     pub fn from_smime(input: &[u8]) -> Result<(Pkcs7, Option<Vec<u8>>), ErrorStack> {
         ffi::init();
 
@@ -96,6 +97,7 @@ impl Pkcs7 {
     /// This corresponds to [`PKCS7_encrypt`].
     ///
     /// [`PKCS7_encrypt`]: https://www.openssl.org/docs/man1.0.2/crypto/PKCS7_encrypt.html
+    #[cfg(not(boringssl))]
     pub fn encrypt(
         certs: &StackRef<X509>,
         input: &[u8],
@@ -155,6 +157,7 @@ impl Pkcs7Ref {
     /// This corresponds to [`SMIME_write_PKCS7`].
     ///
     /// [`SMIME_write_PKCS7`]: https://www.openssl.org/docs/man1.1.0/crypto/SMIME_write_PKCS7.html
+    #[cfg(not(boringssl))]
     pub fn to_smime(&self, input: &[u8], flags: Pkcs7Flags) -> Result<Vec<u8>, ErrorStack> {
         let input_bio = MemBioSlice::new(input)?;
         let output = MemBio::new()?;
@@ -191,6 +194,7 @@ impl Pkcs7Ref {
     /// This corresponds to [`PKCS7_decrypt`].
     ///
     /// [`PKCS7_decrypt`]: https://www.openssl.org/docs/man1.0.2/crypto/PKCS7_decrypt.html
+    #[cfg(not(boringssl))]
     pub fn decrypt<PT>(
         &self,
         pkey: &PKeyRef<PT>,
@@ -224,6 +228,7 @@ impl Pkcs7Ref {
     /// This corresponds to [`PKCS7_verify`].
     ///
     /// [`PKCS7_verify`]: https://www.openssl.org/docs/man1.0.2/crypto/PKCS7_verify.html
+    #[cfg(not(boringssl))]
     pub fn verify(
         &self,
         certs: &StackRef<X509>,
@@ -261,7 +266,7 @@ impl Pkcs7Ref {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(boringssl)))]
 mod tests {
     use pkcs7::{Pkcs7, Pkcs7Flags};
     use pkey::PKey;

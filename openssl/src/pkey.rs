@@ -351,6 +351,7 @@ impl PKey<Private> {
     /// # Note
     ///
     /// To compute HMAC values, use the `sign` module.
+    #[cfg(not(boringssl))]
     pub fn hmac(key: &[u8]) -> Result<PKey<Private>, ErrorStack> {
         unsafe {
             assert!(key.len() <= c_int::max_value() as usize);
@@ -557,6 +558,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(boringssl))]
     fn test_to_password() {
         let rsa = Rsa::generate(2048).unwrap();
         let pkey = PKey::from_rsa(rsa).unwrap();

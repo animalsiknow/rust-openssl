@@ -29,6 +29,7 @@ pub const PKCS7_REUSE_DIGEST: c_int = 0x8000;
 pub const PKCS7_NO_DUAL_CONTENT: c_int = 0x10000;
 
 extern "C" {
+    #[cfg(not(boringssl))]
     pub fn PKCS7_encrypt(
         certs: *mut stack_st_X509,
         b: *mut BIO,
@@ -36,6 +37,7 @@ extern "C" {
         flags: c_int,
     ) -> *mut PKCS7;
 
+    #[cfg(not(boringssl))]
     pub fn PKCS7_verify(
         pkcs7: *mut PKCS7,
         certs: *mut stack_st_X509,
@@ -53,6 +55,7 @@ extern "C" {
         flags: c_int,
     ) -> *mut PKCS7;
 
+    #[cfg(not(boringssl))]
     pub fn PKCS7_decrypt(
         pkcs7: *mut PKCS7,
         pkey: *mut EVP_PKEY,
@@ -63,6 +66,7 @@ extern "C" {
 
     pub fn PKCS7_free(pkcs7: *mut PKCS7);
 
+    #[cfg(not(boringssl))]
     pub fn SMIME_write_PKCS7(
         out: *mut BIO,
         pkcs7: *mut PKCS7,
@@ -70,5 +74,6 @@ extern "C" {
         flags: c_int,
     ) -> c_int;
 
+    #[cfg(not(boringssl))]
     pub fn SMIME_read_PKCS7(bio: *mut BIO, bcont: *mut *mut BIO) -> *mut PKCS7;
 }

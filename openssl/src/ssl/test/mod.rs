@@ -18,6 +18,7 @@ use tempdir::TempDir;
 
 use dh::Dh;
 use hash::MessageDigest;
+#[cfg(not(boringssl))]
 use ocsp::{OcspResponse, OcspResponseStatus};
 use pkey::PKey;
 use srtp::SrtpProfileId;
@@ -963,6 +964,7 @@ fn active_session() {
 }
 
 #[test]
+#[cfg(not(boringssl))]
 fn status_callbacks() {
     static CALLED_BACK_SERVER: AtomicBool = AtomicBool::new(false);
     static CALLED_BACK_CLIENT: AtomicBool = AtomicBool::new(false);

@@ -17,6 +17,7 @@ v110 = []
 v111 = []
 
 vendored = ['openssl-sys/vendored']
+boringssl = ['openssl-sys/boringssl']
 
 [dependencies]
 bitflags = "1.0"

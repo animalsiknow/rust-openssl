@@ -94,6 +94,7 @@ impl MessageDigest {
         unsafe { MessageDigest(ffi::EVP_shake256()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn ripemd160() -> MessageDigest {
         unsafe { MessageDigest(ffi::EVP_ripemd160()) }
     }
@@ -585,6 +586,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(boringssl))]
     fn test_ripemd160() {
         let tests = [("616263", "8eb208f7e05d987a9b044a8e98c6b087f15a0bfc")];
 

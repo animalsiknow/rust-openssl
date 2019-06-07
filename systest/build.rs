@@ -1,5 +1,6 @@
 extern crate ctest;
 
+use cfgs::CVersion;
 use std::env;
 
 #[path = "../openssl-sys/build/cfgs.rs"]
@@ -28,14 +29,17 @@ fn main() {
         cfg.define("WIN32_LEAN_AND_MEAN", None);
     }
 
-    let openssl_version = env::var("DEP_OPENSSL_VERSION_NUMBER")
-        .ok()
-        .map(|v| u64::from_str_radix(&v, 16).unwrap());
-    let libressl_version = env::var("DEP_OPENSSL_LIBRESSL_VERSION_NUMBER")
-        .ok()
-        .map(|v| u64::from_str_radix(&v, 16).unwrap());
+    let version = if let Ok(ref openssl_version) = env::var("DEP_OPENSSL_VERSION_NUMBER") {
+        CVersion::OpenSsl( u64::from_str_radix(openssl_version, 16).unwrap())
+    } else if let Ok(ref libressl_version) = env::var("DEP_OPENSSL_LIBRESSL_VERSION_NUMBER") {
+        CVersion::LibreSsl(u64::from_str_radix(libressl_version, 16).unwrap())
+    } else if let Ok(ref boringssl_version) = env::var("DEP_OPENSSL_BORINGSSL_VERSION_NUMBER") {
+        CVersion::BoringSsl(u64::from_str_radix(boringssl_version, 10).unwrap())
+    } else {
+        panic!("unsupported configuration");
+    };
 
-    for c in cfgs::get(openssl_version, libressl_version) {
+    for c in cfgs::get(version) {
         cfg.cfg(c, None);
     }
 
@@ -63,7 +67,7 @@ fn main() {
         .header("openssl/ocsp.h")
         .header("openssl/evp.h");
 
-    if openssl_version.is_some() {
+    if let CVersion::OpenSsl(_) = version {
         cfg.header("openssl/cms.h");
     }
 
